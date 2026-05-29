@@ -1240,3 +1240,20 @@ footer {
   .stat-item { padding: 0.6rem 1.5rem; }
   .contact-cards { flex-direction: column; }
 }
+/* two download buttons sit side by side */
+.g-footer--row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Excel button — green outline matching the brand */
+.g-download-btn--excel {
+  border-color: var(--forest-light);
+  color: var(--forest-light);
+}
+.g-download-btn--excel:hover {
+  background: var(--forest-light);
+  color: var(--white);
+  border-color: var(--forest-light);
+}
