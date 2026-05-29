@@ -217,3 +217,34 @@ if (navCta) {
     }
   });
 }
+
+
+// ─── 9. DOWNLOAD BUTTONS ─────────────────────────────────────
+/**
+ * Two behaviours:
+ *   a) Disabled buttons — block the click and show a tooltip via CSS ::after.
+ *      We also handle keyboard Enter/Space so screen-reader users aren't confused.
+ *   b) Active download links — log a console event so you can swap in
+ *      real analytics (e.g. gtag / Plausible) later without hunting for the hook.
+ */
+
+// Prevent disabled buttons from doing anything on keyboard interaction
+document.querySelectorAll('.g-download-btn--disabled').forEach(btn => {
+  btn.addEventListener('click',   e => e.preventDefault());
+  btn.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
+  });
+});
+
+// Log download clicks (swap console.log for your analytics call)
+document.querySelectorAll('.g-download-btn:not(.g-download-btn--disabled)').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const filename = btn.getAttribute('download') || 'unknown';
+    // ── analytics hook ─────────────────────────────────────────────────────
+    // Replace this line with your real analytics call, e.g.:
+    //   gtag('event', 'file_download', { file_name: filename });
+    //   plausible('Download', { props: { file: filename } });
+    console.log(`[Portfolio] Download triggered: ${filename}`);
+    // ───────────────────────────────────────────────────────────────────────
+  });
+});
