@@ -976,6 +976,29 @@ button { font-family: inherit; cursor: pointer; }
   transform: translateX(-50%) translateY(0);
 }
 
+/* loading state — while the blob is being fetched */
+.g-download-btn--loading {
+  pointer-events: none;   /* prevent double-clicks during fetch */
+  opacity: 0.75;
+  cursor: wait;
+  border-color: var(--forest-light);
+  color: var(--forest-mid);
+}
+.g-download-btn--loading:hover {
+  background: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
+/* spinning icon inside the loading button */
+@keyframes spinCW {
+  to { transform: rotate(360deg); }
+}
+.btn-spinner {
+  animation: spinCW 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
 
 /* ═══════════════════════════════════════════════════════════
    SKILLS
