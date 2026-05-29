@@ -221,30 +221,131 @@ if (navCta) {
 
 // ─── 9. DOWNLOAD BUTTONS ─────────────────────────────────────
 /**
- * Two behaviours:
- *   a) Disabled buttons — block the click and show a tooltip via CSS ::after.
- *      We also handle keyboard Enter/Space so screen-reader users aren't confused.
- *   b) Active download links — log a console event so you can swap in
- *      real analytics (e.g. gtag / Plausible) later without hunting for the hook.
+ * WHY THIS EXISTS:
+ * Browsers ignore the `download` attribute on <a> tags when the file is
+ * cross-origin (e.g. your site is on Netlify but the PDF is on
+ * raw.githubusercontent.com). The browser opens the file instead of saving it.
+ *
+ * FIX: Intercept every download click, fetch the PDF as a binary blob on the
+ * client, turn it into a temporary local URL, then programmatically click a
+ * hidden <a download> — which always triggers the Save dialog because the
+ * blob URL is same-origin by definition.
+ *
+ * If the fetch fails (e.g. file not uploaded yet), we fall back to opening
+ * the URL in a new tab so the user isn't left with nothing.
  */
 
-// Prevent disabled buttons from doing anything on keyboard interaction
+// ── SVG icons used inside the button ──
+const ICON_DOWNLOAD = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+  stroke-linejoin="round" aria-hidden="true">
+  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+  <polyline points="7 10 12 15 17 10"/>
+  <line x1="12" y1="15" x2="12" y2="3"/>
+</svg>`;
+
+const ICON_SPINNER = `<svg class="btn-spinner" width="14" height="14" viewBox="0 0 24 24"
+  fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+  aria-hidden="true">
+  <path d="M12 2a10 10 0 1 0 10 10" />
+</svg>`;
+
+const ICON_CHECK = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+  stroke-linejoin="round" aria-hidden="true">
+  <polyline points="20 6 9 17 4 12"/>
+</svg>`;
+
+/**
+ * triggerBlobDownload(url, filename, btn)
+ *
+ * 1. Puts the button into a loading state.
+ * 2. Fetches the remote PDF as a Blob (works cross-origin because
+ *    raw.githubusercontent.com sends CORS headers allowing all origins).
+ * 3. Creates a temporary blob:// URL — which IS same-origin — and clicks a
+ *    hidden anchor with the `download` attribute, forcing a Save dialog.
+ * 4. Cleans up and restores the button.
+ * 5. On any error, opens the URL in a new tab as a fallback.
+ */
+async function triggerBlobDownload (url, filename, btn) {
+
+  // ── save original button content so we can restore it ──
+  const originalHTML = btn.innerHTML;
+
+  // ── loading state ──────────────────────────────────────
+  btn.classList.add('g-download-btn--loading');
+  btn.setAttribute('aria-disabled', 'true');
+  btn.innerHTML = `${ICON_SPINNER} Downloading…`;
+
+  try {
+    const response = await fetch(url, { mode: 'cors' });
+
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status} — check the file URL.`);
+    }
+
+    const blob    = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    // Create a hidden anchor, click it, then immediately remove it
+    const tempLink    = document.createElement('a');
+    tempLink.href     = blobUrl;
+    tempLink.download = filename;
+    tempLink.style.display = 'none';
+    document.body.appendChild(tempLink);
+    tempLink.click();
+    document.body.removeChild(tempLink);
+
+    // Release the blob URL after the browser has had time to start the download
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+
+    // ── brief success state ────────────────────────────────
+    btn.innerHTML = `${ICON_CHECK} Saved!`;
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.classList.remove('g-download-btn--loading');
+      btn.removeAttribute('aria-disabled');
+    }, 2000);
+
+    // ── optional analytics hook ────────────────────────────
+    // Uncomment and swap for your real analytics:
+    // gtag('event', 'file_download', { file_name: filename });
+    // plausible('Download', { props: { file: filename } });
+    console.log(`[Portfolio] Downloaded: ${filename}`);
+
+  } catch (err) {
+    console.error('[Portfolio] Blob download failed — falling back to new tab:', err);
+    window.open(url, '_blank', 'noopener,noreferrer');
+
+    // Restore button immediately on error
+    btn.innerHTML = originalHTML;
+    btn.classList.remove('g-download-btn--loading');
+    btn.removeAttribute('aria-disabled');
+  }
+}
+
+// ── Wire up every active download button ───────────────────────────────────
+document.querySelectorAll('.g-download-btn:not(.g-download-btn--disabled)').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();   // stop the default anchor navigation
+
+    const url      = btn.getAttribute('href');
+    const filename = btn.getAttribute('download') || 'project.pdf';
+
+    if (!url || url.includes('YOUR-USERNAME')) {
+      // Placeholder URL not yet replaced — warn the developer
+      console.warn('[Portfolio] Download button has a placeholder URL. Update the href in index.html.');
+      return;
+    }
+
+    triggerBlobDownload(url, filename, btn);
+  });
+});
+
+// ── Block disabled (Coming Soon) buttons ───────────────────────────────────
 document.querySelectorAll('.g-download-btn--disabled').forEach(btn => {
   btn.addEventListener('click',   e => e.preventDefault());
   btn.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
-  });
-});
-
-// Log download clicks (swap console.log for your analytics call)
-document.querySelectorAll('.g-download-btn:not(.g-download-btn--disabled)').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const filename = btn.getAttribute('download') || 'unknown';
-    // ── analytics hook ─────────────────────────────────────────────────────
-    // Replace this line with your real analytics call, e.g.:
-    //   gtag('event', 'file_download', { file_name: filename });
-    //   plausible('Download', { props: { file: filename } });
-    console.log(`[Portfolio] Download triggered: ${filename}`);
-    // ───────────────────────────────────────────────────────────────────────
   });
 });
